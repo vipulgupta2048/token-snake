@@ -4,7 +4,6 @@
  * token-snake CLI — play Token Snake directly from your terminal.
  *
  *   npx token-snake                  # play standalone
- *   npx token-snake --agent          # play with live agent status in HUD
  *   npx token-snake --pid 123        # play while watching a process
  *   npx token-snake --claude install # install Claude Code hooks
  *   npx token-snake --help           # show help
@@ -17,8 +16,6 @@ import {join} from 'node:path';
 import {homedir} from 'node:os';
 
 const VERSION = '0.1.0';
-const STATUS_DIR = join(homedir(), '.token-snake');
-const STATUS_FILE = join(STATUS_DIR, 'status');
 
 const args = process.argv.slice(2);
 
@@ -38,14 +35,12 @@ if (args.includes('--help') || args.includes('-h')) {
   USAGE
     $ npx token-snake                    Play standalone
     $ npx token-snake --music            Play with chiptune music
-    $ npx token-snake --agent            Play with live agent status in HUD
     $ npx token-snake --pid <PID>        Play while watching a process
     $ npx token-snake --claude install   Install Claude Code hooks
     $ npx token-snake --claude remove    Remove Claude Code hooks
 
   OPTIONS
     --music              Enable chiptune background music
-    --agent              Watch ~/.token-snake/status for live agent updates
     --pid <PID>          Monitor a process — notifies you when it exits
     --claude <action>    Install or remove Claude Code hooks (install | remove)
     -h, --help           Show this help
@@ -112,7 +107,7 @@ if (claudeIdx >= 0) {
 				hooks: [
 					{
 						type: 'command',
-						command: `mkdir -p ~/.token-snake && echo "session-start" > ~/.token-snake/status && echo "\\x1b[90m🐍 token-snake: run \\x1b[0mnpx token-snake --agent\\x1b[90m in another pane to play while Claude works\\x1b[0m"`,
+						command: `mkdir -p ~/.token-snake && echo "session-start" > ~/.token-snake/status && echo "\\x1b[90m🐍 token-snake: run \\x1b[0mnpx token-snake\\x1b[90m in another pane to play while Claude works\\x1b[0m"`,
 					},
 				],
 			},
@@ -164,7 +159,7 @@ if (claudeIdx >= 0) {
 
   To play while Claude works:
     1. Open a split terminal pane
-    2. Run: npx token-snake --agent
+    2. Run: npx token-snake
     3. Start using Claude Code in the other pane
 `);
 		} catch (err) {
@@ -217,18 +212,7 @@ if (pidIdx >= 0 && (!watchPid || isNaN(watchPid))) {
 	process.exit(1);
 }
 
-// ── --agent mode ────────────────────────────────────────────────────────────
-const agentMode = args.includes('--agent');
 const musicMode = args.includes('--music');
-
-function readStatusFile(): string {
-	try {
-		if (!existsSync(STATUS_FILE)) return '';
-		return readFileSync(STATUS_FILE, 'utf-8').trim().slice(0, 80);
-	} catch {
-		return '';
-	}
-}
 
 function isProcessAlive(pid: number): boolean {
 	try {
@@ -255,10 +239,6 @@ const game = startSnakeGame({
 			if (pidDone) return 'Process complete!';
 			return `Watching PID ${watchPid}...`;
 		}
-		if (agentMode) {
-			const status = readStatusFile();
-			return status || 'Waiting for agent...';
-		}
 		return '';
 	},
 	onExit: () => {
@@ -276,17 +256,6 @@ if (watchPid) {
 			clearInterval(pidCheck);
 		}
 	}, 2000);
-}
-
-// Agent mode — watch status file for "done" signals
-if (agentMode) {
-	const agentCheck = setInterval(() => {
-		const status = readStatusFile().toLowerCase();
-		if (status === 'done' || status.includes('session ended') || status.includes('complete')) {
-			game.notifyDone();
-			clearInterval(agentCheck);
-		}
-	}, 1000);
 }
 
 // Parse raw stdin into key objects that the game understands

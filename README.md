@@ -106,7 +106,7 @@ Token budget blown — Crashed into obstacle
 
 ## 🤖 Play while your AI agent works
 
-token-snake was built to fill the dead time while LLM coding agents process prompts. Six ways to wire it up:
+token-snake was built to fill the dead time while LLM coding agents process prompts. Five ways to wire it up:
 
 ### 1. Just play
 
@@ -116,15 +116,7 @@ npx token-snake
 
 Split pane, second tab, coffee break — works anywhere.
 
-### 2. Agent-aware mode
-
-```bash
-npx token-snake --agent
-```
-
-Watches `~/.token-snake/status` for real-time updates. Any tool can write to that file — the content shows in the top-right HUD. When the status says "done", the game notifies you.
-
-### 3. Claude Code hooks
+### 2. Claude Code hooks
 
 ```bash
 npx token-snake --claude install
@@ -140,9 +132,9 @@ One command installs hooks into `~/.claude/settings.json`:
 | `SessionStart` | "play token-snake" hint |
 | `SessionEnd` | "Agent done!" |
 
-Then split your terminal: `npx token-snake --agent` in one pane, Claude Code in the other. Remove anytime with `npx token-snake --claude remove`.
+Then split your terminal: `npx token-snake` in one pane, Claude Code in the other. Remove anytime with `npx token-snake --claude remove`.
 
-### 4. Process watcher
+### 3. Process watcher
 
 ```bash
 npx token-snake --pid $(pgrep -f "npm install")
@@ -150,7 +142,7 @@ npx token-snake --pid $(pgrep -f "npm install")
 
 Monitors any PID. Notifies you when the process exits.
 
-### 5. Library API
+### 4. Library API
 
 ```ts
 import { startSnakeGame } from 'token-snake';
@@ -167,11 +159,11 @@ game.notifyDone();
 game.pause(); game.resume();
 ```
 
-### 6. Shell alias
+### 5. Shell alias
 
 ```bash
 # Add to ~/.zshrc or ~/.bashrc
-alias snake='npx token-snake --agent'
+alias snake='npx token-snake'
 ```
 
 ## 🏗️ How it was built
