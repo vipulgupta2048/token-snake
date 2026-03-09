@@ -5,7 +5,7 @@
 <p align="center">
   <strong>An LLM-themed Snake game for your terminal.</strong><br/>
   Eat tokens. Dodge hallucinations. Grow your context window.<br/>
-  Play while your AI agent thinks.
+  Play while your code compiles.
 </p>
 
 <p align="center">
@@ -104,9 +104,9 @@ SIGSNAKE received — Ate yourself
 Token budget blown — Crashed into obstacle
 ```
 
-## 🤖 Play while your AI agent works
+## 🤖 Play while you wait
 
-token-snake was built to fill the dead time while LLM coding agents process prompts. Five ways to wire it up:
+token-snake was built to fill the dead time — waiting for builds, deploys, or LLM responses. Four ways to wire it up:
 
 ### 1. Just play
 
@@ -124,13 +124,13 @@ npx token-snake --claude install
 
 One command installs hooks into `~/.claude/settings.json`:
 
-| Hook | HUD shows |
+| Hook | What happens |
 |------|-----------|
-| `PreToolUse` | Bash commands running |
-| `PostToolUse` | Files being edited |
-| `Notification` | Claude's notifications |
-| `SessionStart` | "play token-snake" hint |
-| `SessionEnd` | "Agent done!" |
+| `PreToolUse` | Shows bash commands in HUD |
+| `PostToolUse` | Shows edited files in HUD |
+| `Notification` | Bridges Claude notifications |
+| `SessionStart` | Prints a "play token-snake" hint |
+| `SessionEnd` | Notifies game that session is done |
 
 Then split your terminal: `npx token-snake` in one pane, Claude Code in the other. Remove anytime with `npx token-snake --claude remove`.
 
@@ -159,32 +159,16 @@ game.notifyDone();
 game.pause(); game.resume();
 ```
 
-### 5. Shell alias
-
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-alias snake='npx token-snake'
-```
-
 ## 🏗️ How it was built
 
-token-snake was built entirely with AI coding agents — specifically [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and GitHub Copilot. The irony isn't lost on us: an AI built the game you play while waiting for AI.
+An AI built the game you play while waiting for AI.
 
 **The stack is intentionally minimal:**
-- ~1,200 lines of TypeScript across two files (`index.ts` game engine, `cli.ts` CLI)
-- **Zero runtime dependencies** — only Node.js built-ins (`fs`, `os`, `path`, `child_process`)
-- Compiled to ESM with [tsup](https://github.com/egoist/tsup)
+- Pure TypeScript 
+- Zero runtime dependencies
 - Renders directly via `fs.writeSync(1)` to bypass Node.js stream machinery
+- Use alternative screen buffers and DEC Private Mode 2026 to eliminate any flickering
 
-**Key technical decisions the AI made:**
-- **Alternate screen buffer** (`\x1b[?1049h`) — same trick `vim` and `htop` use. Your terminal content is untouched
-- **DEC mode 2026** for synchronized output — the terminal buffers the entire frame and paints it atomically. Zero flicker
-- **Stdout monkey-patching** — if embedded in an Ink/React CLI, the game patches `process.stdout.write` to a noop so framework writes don't scribble over the game
-- **Direction queue** with wall forgiveness — buffers up to 3 keypresses so fast inputs don't get dropped, and tries queued turns before killing you on walls
-- **Chiptune audio** — generates PCM WAV in-memory (square wave synthesis), pipes to `afplay`/`aplay`. No audio files, no audio libraries
-- **Speed curve** — `90ms - (length / 6) × 2ms` with a 55ms floor. Feels comfortable at start, frantic by endgame
-
-**The development process:** one prompt → plan → implement → test → ship. The initial v0.1.0 (game engine, 6 agent activation methods, Claude Code hooks, professional repo setup, README, npm publish) was done in a single session. Bug fixes and features (death message overflow, taller obstacles, music) were iterated live from screenshots.
 
 ## 📄 License
 
