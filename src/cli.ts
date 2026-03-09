@@ -4,8 +4,8 @@
  * token-snake CLI — play Token Snake directly from your terminal.
  *
  *   npx token-snake                  # play standalone
- *   npx token-snake --pid 123        # play while watching a process
- *   npx token-snake --claude install # install Claude Code hooks
+ *   npx token-snake --claude         # install Claude Code hooks
+ *   npx token-snake --claude remove  # remove Claude Code hooks
  *   npx token-snake --help           # show help
  *   npx token-snake --version        # show version
  */
@@ -35,14 +35,13 @@ if (args.includes('--help') || args.includes('-h')) {
   USAGE
     $ npx token-snake                    Play standalone
     $ npx token-snake --music            Play with chiptune music
-    $ npx token-snake --pid <PID>        Play while watching a process
-    $ npx token-snake --claude install   Install Claude Code hooks
+    $ npx token-snake --claude           Install Claude Code hooks
     $ npx token-snake --claude remove    Remove Claude Code hooks
 
   OPTIONS
     --music              Enable chiptune background music
-    --pid <PID>          Monitor a process — notifies you when it exits
-    --claude <action>    Install or remove Claude Code hooks (install | remove)
+    --claude             Install Claude Code hooks (auto-install)
+    --claude remove      Remove Claude Code hooks
     -h, --help           Show this help
     -v, --version        Show version
 
@@ -52,17 +51,13 @@ if (args.includes('--help') || args.includes('-h')) {
     P                        Pause / Resume
     Q                        Quit
 
-  EMBED IN YOUR CLI
-    import { startSnakeGame } from 'token-snake';
-    const game = startSnakeGame({ onExit: () => {} });
-
   MORE INFO
     https://github.com/vipulgupta2048/token-snake
 `);
 	process.exit(0);
 }
 
-// ── --claude install / remove ───────────────────────────────────────────────
+// ── --claude [remove] ──────────────────────────────────────────────────────
 const claudeIdx = args.indexOf('--claude');
 if (claudeIdx >= 0) {
 	const sub = args[claudeIdx + 1];
@@ -124,51 +119,6 @@ if (claudeIdx >= 0) {
 		],
 	};
 
-	if (sub === 'install') {
-		try {
-			let settings: Record<string, unknown> = {};
-			if (existsSync(claudeSettings)) {
-				settings = JSON.parse(readFileSync(claudeSettings, 'utf-8'));
-			} else {
-				mkdirSync(join(homedir(), '.claude'), {recursive: true});
-			}
-
-			const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-
-			// Merge token-snake hooks (avoid duplicates by checking for marker in command strings)
-			for (const [hookName, hookEntries] of Object.entries(TOKEN_SNAKE_HOOKS)) {
-				const existing = (hooks[hookName] ?? []) as Array<{hooks?: Array<{command?: string}>}>;
-				const filtered = existing.filter(
-					(e) => !e.hooks?.some((h) => h.command?.includes(HOOK_MARKER)),
-				);
-				hooks[hookName] = [...filtered, ...hookEntries];
-			}
-
-			settings.hooks = hooks;
-			writeFileSync(claudeSettings, JSON.stringify(settings, null, '\t'));
-
-			console.log(`
-  ✅ Claude Code hooks installed!
-
-  Hooks added to: ${claudeSettings}
-    • PreToolUse   → Shows running bash commands in game HUD
-    • PostToolUse  → Shows edited files in game HUD
-    • Notification → Bridges Claude notifications to game
-    • SessionStart → Prints a hint to play token-snake
-    • SessionEnd   → Notifies game that session is done
-
-  To play while Claude works:
-    1. Open a split terminal pane
-    2. Run: npx token-snake
-    3. Start using Claude Code in the other pane
-`);
-		} catch (err) {
-			console.error(`  ❌ Failed to install hooks: ${(err as Error).message}`);
-			process.exit(1);
-		}
-		process.exit(0);
-	}
-
 	if (sub === 'remove') {
 		try {
 			if (!existsSync(claudeSettings)) {
@@ -199,64 +149,66 @@ if (claudeIdx >= 0) {
 		process.exit(0);
 	}
 
-	console.log('  Usage: token-snake --claude install | token-snake --claude remove');
-	process.exit(1);
-}
-
-// ── --pid <PID> ─────────────────────────────────────────────────────────────
-const pidIdx = args.indexOf('--pid');
-const watchPid = pidIdx >= 0 ? parseInt(args[pidIdx + 1] ?? '', 10) : null;
-
-if (pidIdx >= 0 && (!watchPid || isNaN(watchPid))) {
-	console.error('  Usage: token-snake --pid <PID>');
-	process.exit(1);
-}
-
-const musicMode = args.includes('--music');
-
-function isProcessAlive(pid: number): boolean {
+	// Default: install hooks
 	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
+		let settings: Record<string, unknown> = {};
+		if (existsSync(claudeSettings)) {
+			settings = JSON.parse(readFileSync(claudeSettings, 'utf-8'));
+		} else {
+			mkdirSync(join(homedir(), '.claude'), {recursive: true});
+		}
+
+		const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+
+		for (const [hookName, hookEntries] of Object.entries(TOKEN_SNAKE_HOOKS)) {
+			const existing = (hooks[hookName] ?? []) as Array<{hooks?: Array<{command?: string}>}>;
+			const filtered = existing.filter(
+				(e) => !e.hooks?.some((h) => h.command?.includes(HOOK_MARKER)),
+			);
+			hooks[hookName] = [...filtered, ...hookEntries];
+		}
+
+		settings.hooks = hooks;
+		writeFileSync(claudeSettings, JSON.stringify(settings, null, '\t'));
+
+		console.log(`
+  ✅ Claude Code hooks installed!
+
+  Hooks added to: ${claudeSettings}
+    • PreToolUse   → Shows running bash commands in game HUD
+    • PostToolUse  → Shows edited files in game HUD
+    • Notification → Bridges Claude notifications to game
+    • SessionStart → Prints a hint to play token-snake
+    • SessionEnd   → Notifies game that session is done
+
+  To play while Claude works:
+    1. Open a split terminal pane
+    2. Run: npx token-snake
+    3. Start using Claude Code in the other pane
+`);
+	} catch (err) {
+		console.error(`  ❌ Failed to install hooks: ${(err as Error).message}`);
+		process.exit(1);
 	}
+	process.exit(0);
 }
 
 // ── Start game ──────────────────────────────────────────────────────────────
+
+const musicMode = args.includes('--music');
 
 if (process.stdin.isTTY) {
 	process.stdin.setRawMode(true);
 }
 process.stdin.resume();
 
-let pidDone = false;
-
 const game = startSnakeGame({
 	music: musicMode,
-	statusFn: () => {
-		if (watchPid) {
-			if (pidDone) return 'Process complete!';
-			return `Watching PID ${watchPid}...`;
-		}
-		return '';
-	},
 	onExit: () => {
 		process.stdin.setRawMode?.(false);
 		process.exit(0);
 	},
 });
-
-// PID watcher — check every 2 seconds
-if (watchPid) {
-	const pidCheck = setInterval(() => {
-		if (!isProcessAlive(watchPid)) {
-			pidDone = true;
-			game.notifyDone();
-			clearInterval(pidCheck);
-		}
-	}, 2000);
-}
 
 // Parse raw stdin into key objects that the game understands
 process.stdin.on('data', (data: Buffer) => {
