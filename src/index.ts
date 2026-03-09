@@ -20,9 +20,9 @@
  *   // Auto-pause: game.pause() / game.resume()
  */
 
-import {writeSync, readFileSync, writeFileSync, mkdirSync, existsSync} from 'node:fs';
+import {writeSync, readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync} from 'node:fs';
 import {join} from 'node:path';
-import {homedir} from 'node:os';
+import {homedir, tmpdir} from 'node:os';
 import {spawn, type ChildProcess} from 'node:child_process';
 
 // ─── ANSI ────────────────────────────────────────────────────────────────────
@@ -118,28 +118,30 @@ function bgLoop(): Int16Array {
 }
 
 let musicProc: ChildProcess | null = null;
+const tempAudioFiles: string[] = [];
 
 function playAudio(pcm: Int16Array): ChildProcess | null {
 	const wav = makeWav(pcm);
 	const platform = process.platform;
-	let cmd: string;
-	let args: string[];
-	if (platform === 'darwin') {
-		cmd = 'afplay';
-		args = ['-'];
-	} else if (platform === 'linux') {
-		cmd = 'aplay';
-		args = ['-q', '-f', 'S16_LE', '-r', String(SAMPLE_RATE), '-c', '1', '-'];
-	} else {
-		return null; // Windows — skip audio
-	}
 	try {
-		const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'ignore'] });
-		child.stdin?.write(wav);
-		child.stdin?.end();
-		child.on('error', () => {}); // swallow if command not found
-		return child;
-	} catch { return null; }
+		if (platform === 'darwin') {
+			// afplay doesn't support stdin — write a temp file
+			const tmpFile = join(tmpdir(), `token-snake-${Date.now()}.wav`);
+			writeFileSync(tmpFile, wav);
+			tempAudioFiles.push(tmpFile);
+			const child = spawn('afplay', [tmpFile], { stdio: ['ignore', 'ignore', 'ignore'] });
+			child.on('error', () => {});
+			child.on('close', () => { try { unlinkSync(tmpFile); } catch {} });
+			return child;
+		} else if (platform === 'linux') {
+			const child = spawn('aplay', ['-q', '-f', 'S16_LE', '-r', String(SAMPLE_RATE), '-c', '1', '-'], { stdio: ['pipe', 'ignore', 'ignore'] });
+			child.stdin?.write(wav);
+			child.stdin?.end();
+			child.on('error', () => {});
+			return child;
+		}
+	} catch { /* ignore */ }
+	return null;
 }
 
 function startMusic() {
@@ -158,6 +160,8 @@ function stopMusic() {
 		try { musicProc.kill(); } catch {}
 		musicProc = null;
 	}
+	for (const f of tempAudioFiles) { try { unlinkSync(f); } catch {} }
+	tempAudioFiles.length = 0;
 }
 
 // ─── High scores ─────────────────────────────────────────────────────────────
