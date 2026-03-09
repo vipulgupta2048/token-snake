@@ -185,8 +185,12 @@ function startBgMusic() {
 }
 
 function startMusic() {
+	// Stop any existing playback first
+	if (musicProc) {
+		try { musicProc.kill(); } catch {}
+		musicProc = null;
+	}
 	musicEnabled = true;
-	stopMusic();
 	// Play startup jingle, then start looping background music
 	const jingle = playAudio(startupJingle());
 	if (!jingle) return;
