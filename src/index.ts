@@ -49,18 +49,20 @@ const BG = {
 const SYNC_ON = `${E}[?2026h`;
 const SYNC_OFF = `${E}[?2026l`;
 
-// ─── Audio — chiptune music via raw PCM ──────────────────────────────────────
+// ─── Audio — chiptune music & SFX via raw PCM ───────────────────────────────
 
 const SAMPLE_RATE = 22050;
 
-function genTone(freq: number, dur: number, vol = 0.3): Int16Array {
+function genTone(freq: number, dur: number, vol = 0.3, wave: 'square' | 'sine' | 'noise' = 'square'): Int16Array {
 	const samples = Math.floor(SAMPLE_RATE * dur);
 	const buf = new Int16Array(samples);
 	for (let i = 0; i < samples; i++) {
-		// Square wave with soft decay for chiptune feel
 		const t = i / SAMPLE_RATE;
-		const decay = Math.max(0, 1 - t / dur * 0.3);
-		const val = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
+		const decay = Math.max(0, 1 - t / dur * 0.5);
+		let val: number;
+		if (wave === 'noise') val = Math.random() * 2 - 1;
+		else if (wave === 'sine') val = Math.sin(2 * Math.PI * freq * t);
+		else val = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
 		buf[i] = Math.floor(val * vol * decay * 32767);
 	}
 	return buf;
@@ -73,13 +75,13 @@ function makeWav(pcm: Int16Array): Buffer {
 	buf.writeUInt32LE(36 + dataLen, 4);
 	buf.write('WAVE', 8);
 	buf.write('fmt ', 12);
-	buf.writeUInt32LE(16, 16);        // chunk size
-	buf.writeUInt16LE(1, 20);         // PCM
-	buf.writeUInt16LE(1, 22);         // mono
+	buf.writeUInt32LE(16, 16);
+	buf.writeUInt16LE(1, 20);
+	buf.writeUInt16LE(1, 22);
 	buf.writeUInt32LE(SAMPLE_RATE, 24);
-	buf.writeUInt32LE(SAMPLE_RATE * 2, 28); // byte rate
-	buf.writeUInt16LE(2, 32);         // block align
-	buf.writeUInt16LE(16, 34);        // bits per sample
+	buf.writeUInt32LE(SAMPLE_RATE * 2, 28);
+	buf.writeUInt16LE(2, 32);
+	buf.writeUInt16LE(16, 34);
 	buf.write('data', 36);
 	buf.writeUInt32LE(dataLen, 40);
 	for (let i = 0; i < pcm.length; i++) buf.writeInt16LE(pcm[i]!, 44 + i * 2);
@@ -94,30 +96,50 @@ function concatPcm(...parts: Int16Array[]): Int16Array {
 	return out;
 }
 
-// C major pentatonic startup jingle — ascending bright melody
+// Startup jingle — ascending C major pentatonic
 function startupJingle(): Int16Array {
-	const notes = [523, 587, 659, 784, 880, 1047]; // C5 D5 E5 G5 A5 C6
+	const notes = [523, 587, 659, 784, 880, 1047];
 	return concatPcm(...notes.map(f => genTone(f, 0.08, 0.25)));
 }
 
-// Background loop — simple retro bassline that repeats
+// Background loop — repeats many times for continuous play
 function bgLoop(): Int16Array {
 	const pattern = [
-		// bar 1
 		262, 0, 330, 0, 392, 0, 330, 0,
-		// bar 2
 		294, 0, 349, 0, 440, 0, 349, 0,
+		262, 0, 392, 0, 523, 0, 392, 0,
+		349, 0, 440, 0, 523, 0, 440, 0,
 	];
 	const parts: Int16Array[] = [];
 	for (const f of pattern) {
-		parts.push(f === 0 ? new Int16Array(Math.floor(SAMPLE_RATE * 0.06)) : genTone(f, 0.12, 0.12));
+		parts.push(f === 0 ? new Int16Array(Math.floor(SAMPLE_RATE * 0.06)) : genTone(f, 0.12, 0.10, 'sine'));
 	}
-	// repeat 8 times for ~30 seconds of music
 	const bar = concatPcm(...parts);
-	return concatPcm(...Array(8).fill(bar));
+	// ~2 minutes of music so it rarely runs out
+	return concatPcm(...Array(30).fill(bar));
+}
+
+// SFX: eat good food — bright chirp ascending
+function sfxEatGood(): Int16Array {
+	return concatPcm(genTone(880, 0.04, 0.2), genTone(1175, 0.04, 0.2), genTone(1318, 0.06, 0.15));
+}
+
+// SFX: eat bad food — dissonant buzz descending
+function sfxEatBad(): Int16Array {
+	return concatPcm(genTone(300, 0.06, 0.25), genTone(200, 0.08, 0.2, 'noise'), genTone(150, 0.1, 0.15));
+}
+
+// SFX: game over — dramatic descending + noise crash
+function sfxGameOver(): Int16Array {
+	return concatPcm(
+		genTone(523, 0.1, 0.3), genTone(440, 0.1, 0.25),
+		genTone(349, 0.1, 0.2), genTone(262, 0.15, 0.2),
+		genTone(196, 0.2, 0.15), genTone(100, 0.3, 0.1, 'noise'),
+	);
 }
 
 let musicProc: ChildProcess | null = null;
+let musicEnabled = false;
 const tempAudioFiles: string[] = [];
 
 function playAudio(pcm: Int16Array): ChildProcess | null {
@@ -125,8 +147,7 @@ function playAudio(pcm: Int16Array): ChildProcess | null {
 	const platform = process.platform;
 	try {
 		if (platform === 'darwin') {
-			// afplay doesn't support stdin — write a temp file
-			const tmpFile = join(tmpdir(), `token-snake-${Date.now()}.wav`);
+			const tmpFile = join(tmpdir(), `token-snake-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.wav`);
 			writeFileSync(tmpFile, wav);
 			tempAudioFiles.push(tmpFile);
 			const child = spawn('afplay', [tmpFile], { stdio: ['ignore', 'ignore', 'ignore'] });
@@ -144,18 +165,39 @@ function playAudio(pcm: Int16Array): ChildProcess | null {
 	return null;
 }
 
+// Fire-and-forget SFX — plays independently of background music
+function playSfx(pcm: Int16Array) {
+	if (!musicEnabled) return;
+	playAudio(pcm);
+}
+
+function startBgMusic() {
+	if (musicProc) { try { musicProc.kill(); } catch {} }
+	musicProc = playAudio(bgLoop());
+	if (!musicProc) return;
+	// When the loop ends, restart it (infinite loop)
+	musicProc.on('close', (code) => {
+		if (musicEnabled && code !== null) {
+			musicProc = null;
+			startBgMusic();
+		}
+	});
+}
+
 function startMusic() {
+	musicEnabled = true;
 	stopMusic();
-	// play startup jingle, then start background loop
+	// Play startup jingle, then start looping background music
 	const jingle = playAudio(startupJingle());
 	if (!jingle) return;
 	jingle.on('close', () => {
-		if (musicProc === jingle) musicProc = playAudio(bgLoop());
+		if (musicEnabled) startBgMusic();
 	});
 	musicProc = jingle;
 }
 
 function stopMusic() {
+	musicEnabled = false;
 	if (musicProc) {
 		try { musicProc.kill(); } catch {}
 		musicProc = null;
@@ -565,6 +607,7 @@ export function startSnakeGame(opts: SnakeGameOptions): SnakeGame {
 			toastColor = eaten.type.color;
 			toastTicks = 25;
 			if (eaten.type.speedBoost) speedBoostTicks = 25;
+			playSfx(eaten.type.dangerous ? sfxEatBad() : sfxEatGood());
 			const g = eaten.type.growth;
 			if (g < 0) {
 				const rem = Math.min(Math.abs(g), snake.length - 3);
@@ -592,6 +635,7 @@ export function startSnakeGame(opts: SnakeGameOptions): SnakeGame {
 		waitForEnter = true;
 		const joke = DEATHS[Math.floor(Math.random() * DEATHS.length)]!;
 		deathMsg = cause ? `${joke} — ${cause}` : joke;
+		playSfx(sfxGameOver());
 		const result = saveScore(score, snake.length);
 		goScores = result.scores;
 		goMyId = result.myId;
