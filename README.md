@@ -10,33 +10,16 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/token-snake"><img src="https://img.shields.io/npm/v/token-snake?color=brightgreen&label=npm" alt="npm version" /></a>
-  <a href="https://www.npmjs.com/package/token-snake"><img src="https://img.shields.io/npm/dm/token-snake?color=blue" alt="npm downloads" /></a>
   <a href="https://github.com/vipulgupta2048/token-snake/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/token-snake?color=yellow" alt="license" /></a>
   <a href="https://github.com/vipulgupta2048/token-snake"><img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="node version" /></a>
 </p>
 
 <br/>
 
-```
-Score: 90  Length: 12  Best: 90                    Juggling...
- $ 4K tokens  /c /compact                  WASD/HJKL:Move P:Pause Q:Quit
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│              ╔══                                             │
-│              ║                                               │
-│              ╚══        ()██▓▓░░··                           │
-│                                                         $$   │
-│         ?!                              <>                   │
-│                    /c                                        │
-│                                                          $   │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-  Eat tokens to grow your context window — score increases with each bite
-```
-
-<br/>
-
 ## ⚡ Play it now
+
+https://github.com/user-attachments/assets/e95635be-8c14-45e2-83fd-a703e0fbe5a2
+
 
 ```bash
 npx token-snake
