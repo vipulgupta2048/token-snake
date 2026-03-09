@@ -3,12 +3,12 @@
 /**
  * token-snake CLI — play Token Snake directly from your terminal.
  *
- *   npx token-snake            # play standalone
- *   npx token-snake --agent    # play with live agent status in HUD
- *   npx token-snake --pid 123  # play while watching a process
- *   npx token-snake hooks install  # install Claude Code hooks
- *   npx token-snake --help     # show help
- *   npx token-snake --version  # show version
+ *   npx token-snake                  # play standalone
+ *   npx token-snake --agent          # play with live agent status in HUD
+ *   npx token-snake --pid 123        # play while watching a process
+ *   npx token-snake --claude install # install Claude Code hooks
+ *   npx token-snake --help           # show help
+ *   npx token-snake --version        # show version
  */
 
 import {startSnakeGame} from './index.js';
@@ -36,19 +36,20 @@ if (args.includes('--help') || args.includes('-h')) {
   Eat tokens, dodge hallucinations, grow your context window.
 
   USAGE
-    $ npx token-snake              Play standalone
-    $ npx token-snake --music      Play with chiptune music
-    $ npx token-snake --agent      Play with live agent status in HUD
-    $ npx token-snake --pid <PID>  Play while watching a process
-    $ npx token-snake hooks install Install Claude Code hooks
-    $ npx token-snake hooks remove  Remove Claude Code hooks
+    $ npx token-snake                    Play standalone
+    $ npx token-snake --music            Play with chiptune music
+    $ npx token-snake --agent            Play with live agent status in HUD
+    $ npx token-snake --pid <PID>        Play while watching a process
+    $ npx token-snake --claude install   Install Claude Code hooks
+    $ npx token-snake --claude remove    Remove Claude Code hooks
 
   OPTIONS
-    --music         Enable chiptune background music
-    --agent         Watch ~/.token-snake/status for live agent updates
-    --pid <PID>     Monitor a process — notifies you when it exits
-    -h, --help      Show this help
-    -v, --version   Show version
+    --music              Enable chiptune background music
+    --agent              Watch ~/.token-snake/status for live agent updates
+    --pid <PID>          Monitor a process — notifies you when it exits
+    --claude <action>    Install or remove Claude Code hooks (install | remove)
+    -h, --help           Show this help
+    -v, --version        Show version
 
   CONTROLS
     W/A/S/D or Arrow keys    Move
@@ -66,9 +67,10 @@ if (args.includes('--help') || args.includes('-h')) {
 	process.exit(0);
 }
 
-// ── hooks install / remove ──────────────────────────────────────────────────
-if (args[0] === 'hooks') {
-	const sub = args[1];
+// ── --claude install / remove ───────────────────────────────────────────────
+const claudeIdx = args.indexOf('--claude');
+if (claudeIdx >= 0) {
+	const sub = args[claudeIdx + 1];
 	const claudeSettings = join(homedir(), '.claude', 'settings.json');
 
 	const HOOK_MARKER = 'token-snake';
@@ -202,7 +204,7 @@ if (args[0] === 'hooks') {
 		process.exit(0);
 	}
 
-	console.log('  Usage: token-snake hooks install | token-snake hooks remove');
+	console.log('  Usage: token-snake --claude install | token-snake --claude remove');
 	process.exit(1);
 }
 

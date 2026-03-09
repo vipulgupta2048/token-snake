@@ -127,7 +127,7 @@ Watches `~/.token-snake/status` for real-time updates. Any tool can write to tha
 ### 3. Claude Code hooks
 
 ```bash
-npx token-snake hooks install
+npx token-snake --claude install
 ```
 
 One command installs hooks into `~/.claude/settings.json`:
@@ -140,7 +140,7 @@ One command installs hooks into `~/.claude/settings.json`:
 | `SessionStart` | "play token-snake" hint |
 | `SessionEnd` | "Agent done!" |
 
-Then split your terminal: `npx token-snake --agent` in one pane, Claude Code in the other. Remove anytime with `npx token-snake hooks remove`.
+Then split your terminal: `npx token-snake --agent` in one pane, Claude Code in the other. Remove anytime with `npx token-snake --claude remove`.
 
 ### 4. Process watcher
 
