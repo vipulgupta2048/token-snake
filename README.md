@@ -1,3 +1,6 @@
+<img width="2912" height="1440" alt="token-snake" src="https://github.com/user-attachments/assets/a68a9bf2-5d69-4f57-8a4c-88f17df6e3f7" />
+
+
 <h1 align="center">
   🐍 token-snake
 </h1>
@@ -23,7 +26,7 @@
 npx token-snake
 ```
 
-https://github.com/user-attachments/assets/e95635be-8c14-45e2-83fd-a703e0fbe5a2
+https://github.com/user-attachments/assets/028f55c7-0df8-4402-ad1b-bb236d9dc1a0
 
 Want music? Add `--music` for chiptune beats.
 
