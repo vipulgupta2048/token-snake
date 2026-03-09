@@ -37,12 +37,14 @@ if (args.includes('--help') || args.includes('-h')) {
 
   USAGE
     $ npx token-snake              Play standalone
+    $ npx token-snake --music      Play with chiptune music
     $ npx token-snake --agent      Play with live agent status in HUD
     $ npx token-snake --pid <PID>  Play while watching a process
     $ npx token-snake hooks install Install Claude Code hooks
     $ npx token-snake hooks remove  Remove Claude Code hooks
 
   OPTIONS
+    --music         Enable chiptune background music
     --agent         Watch ~/.token-snake/status for live agent updates
     --pid <PID>     Monitor a process — notifies you when it exits
     -h, --help      Show this help
@@ -215,6 +217,7 @@ if (pidIdx >= 0 && (!watchPid || isNaN(watchPid))) {
 
 // ── --agent mode ────────────────────────────────────────────────────────────
 const agentMode = args.includes('--agent');
+const musicMode = args.includes('--music');
 
 function readStatusFile(): string {
 	try {
@@ -244,6 +247,7 @@ process.stdin.resume();
 let pidDone = false;
 
 const game = startSnakeGame({
+	music: musicMode,
 	statusFn: () => {
 		if (watchPid) {
 			if (pidDone) return 'Process complete!';

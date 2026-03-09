@@ -23,6 +23,7 @@
 import {writeSync, readFileSync, writeFileSync, mkdirSync, existsSync} from 'node:fs';
 import {join} from 'node:path';
 import {homedir} from 'node:os';
+import {spawn, type ChildProcess} from 'node:child_process';
 
 // ─── ANSI ────────────────────────────────────────────────────────────────────
 const E = '\x1b';
@@ -47,6 +48,117 @@ const BG = {
 };
 const SYNC_ON = `${E}[?2026h`;
 const SYNC_OFF = `${E}[?2026l`;
+
+// ─── Audio — chiptune music via raw PCM ──────────────────────────────────────
+
+const SAMPLE_RATE = 22050;
+
+function genTone(freq: number, dur: number, vol = 0.3): Int16Array {
+	const samples = Math.floor(SAMPLE_RATE * dur);
+	const buf = new Int16Array(samples);
+	for (let i = 0; i < samples; i++) {
+		// Square wave with soft decay for chiptune feel
+		const t = i / SAMPLE_RATE;
+		const decay = Math.max(0, 1 - t / dur * 0.3);
+		const val = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
+		buf[i] = Math.floor(val * vol * decay * 32767);
+	}
+	return buf;
+}
+
+function makeWav(pcm: Int16Array): Buffer {
+	const dataLen = pcm.length * 2;
+	const buf = Buffer.alloc(44 + dataLen);
+	buf.write('RIFF', 0);
+	buf.writeUInt32LE(36 + dataLen, 4);
+	buf.write('WAVE', 8);
+	buf.write('fmt ', 12);
+	buf.writeUInt32LE(16, 16);        // chunk size
+	buf.writeUInt16LE(1, 20);         // PCM
+	buf.writeUInt16LE(1, 22);         // mono
+	buf.writeUInt32LE(SAMPLE_RATE, 24);
+	buf.writeUInt32LE(SAMPLE_RATE * 2, 28); // byte rate
+	buf.writeUInt16LE(2, 32);         // block align
+	buf.writeUInt16LE(16, 34);        // bits per sample
+	buf.write('data', 36);
+	buf.writeUInt32LE(dataLen, 40);
+	for (let i = 0; i < pcm.length; i++) buf.writeInt16LE(pcm[i]!, 44 + i * 2);
+	return buf;
+}
+
+function concatPcm(...parts: Int16Array[]): Int16Array {
+	const total = parts.reduce((s, p) => s + p.length, 0);
+	const out = new Int16Array(total);
+	let off = 0;
+	for (const p of parts) { out.set(p, off); off += p.length; }
+	return out;
+}
+
+// C major pentatonic startup jingle — ascending bright melody
+function startupJingle(): Int16Array {
+	const notes = [523, 587, 659, 784, 880, 1047]; // C5 D5 E5 G5 A5 C6
+	return concatPcm(...notes.map(f => genTone(f, 0.08, 0.25)));
+}
+
+// Background loop — simple retro bassline that repeats
+function bgLoop(): Int16Array {
+	const pattern = [
+		// bar 1
+		262, 0, 330, 0, 392, 0, 330, 0,
+		// bar 2
+		294, 0, 349, 0, 440, 0, 349, 0,
+	];
+	const parts: Int16Array[] = [];
+	for (const f of pattern) {
+		parts.push(f === 0 ? new Int16Array(Math.floor(SAMPLE_RATE * 0.06)) : genTone(f, 0.12, 0.12));
+	}
+	// repeat 8 times for ~30 seconds of music
+	const bar = concatPcm(...parts);
+	return concatPcm(...Array(8).fill(bar));
+}
+
+let musicProc: ChildProcess | null = null;
+
+function playAudio(pcm: Int16Array): ChildProcess | null {
+	const wav = makeWav(pcm);
+	const platform = process.platform;
+	let cmd: string;
+	let args: string[];
+	if (platform === 'darwin') {
+		cmd = 'afplay';
+		args = ['-'];
+	} else if (platform === 'linux') {
+		cmd = 'aplay';
+		args = ['-q', '-f', 'S16_LE', '-r', String(SAMPLE_RATE), '-c', '1', '-'];
+	} else {
+		return null; // Windows — skip audio
+	}
+	try {
+		const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'ignore'] });
+		child.stdin?.write(wav);
+		child.stdin?.end();
+		child.on('error', () => {}); // swallow if command not found
+		return child;
+	} catch { return null; }
+}
+
+function startMusic() {
+	stopMusic();
+	// play startup jingle, then start background loop
+	const jingle = playAudio(startupJingle());
+	if (!jingle) return;
+	jingle.on('close', () => {
+		if (musicProc === jingle) musicProc = playAudio(bgLoop());
+	});
+	musicProc = jingle;
+}
+
+function stopMusic() {
+	if (musicProc) {
+		try { musicProc.kill(); } catch {}
+		musicProc = null;
+	}
+}
 
 // ─── High scores ─────────────────────────────────────────────────────────────
 
@@ -143,16 +255,16 @@ const OPP: Record<Dir, Dir> = {up: 'down', down: 'up', left: 'right', right: 'le
 // Predefined obstacle shapes (relative dx,dy from anchor point)
 // Each shape has a vertical spine for bracket rendering
 const OBSTACLE_SHAPES: Pt[][] = [
-	// Small bracket: ╔══ / ║  / ╚══
-	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:1,y:0},{x:1,y:2}],
-	// Tall bracket: ╔══ / ║  / ║  / ╚══
-	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:0,y:3},{x:1,y:0},{x:1,y:3}],
-	// I-beam: ╔═ / ║  / ║  / ╚═
-	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:0,y:3}],
-	// Short I: ╔═ / ║  / ╚═
-	[{x:0,y:0},{x:0,y:1},{x:0,y:2}],
-	// Mirror bracket: ══╔═ /   ║  / ══╚═
-	[{x:1,y:0},{x:1,y:1},{x:1,y:2},{x:0,y:0},{x:0,y:2}],
+	// Tall bracket: ╔══ / ║  / ║  / ║  / ║  / ╚══  (6 tall)
+	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:0,y:3},{x:0,y:4},{x:0,y:5},{x:1,y:0},{x:1,y:5}],
+	// Tower: ╔═ / ║  / ║  / ║  / ║  / ╚═  (6 tall)
+	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:0,y:3},{x:0,y:4},{x:0,y:5}],
+	// Wide bracket: ╔══ / ║  / ║  / ║  / ╚══  (5 tall)
+	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:0,y:3},{x:0,y:4},{x:1,y:0},{x:1,y:4}],
+	// Pillar: ╔═ / ║  / ║  / ║  / ║  / ║  / ╚═  (7 tall)
+	[{x:0,y:0},{x:0,y:1},{x:0,y:2},{x:0,y:3},{x:0,y:4},{x:0,y:5},{x:0,y:6}],
+	// Mirror wide bracket: ══╔═ /   ║  /   ║  /   ║  / ══╚═  (5 tall)
+	[{x:1,y:0},{x:1,y:1},{x:1,y:2},{x:1,y:3},{x:1,y:4},{x:0,y:0},{x:0,y:4}],
 ];
 
 /** Handle returned by startSnakeGame for controlling the game externally. */
@@ -184,6 +296,8 @@ export interface SnakeGameOptions {
 	statusFn?: () => string;
 	/** Called when the game exits (Q pressed or stopped). */
 	onExit: () => void;
+	/** Enable chiptune background music. Disabled by default. */
+	music?: boolean;
 	/**
 	 * Called before entering alt screen. Use to suppress your framework's
 	 * stdout writes (e.g. patch process.stdout.write with a noop).
@@ -687,6 +801,7 @@ export function startSnakeGame(opts: SnakeGameOptions): SnakeGame {
 	function stop() {
 		if (!running) return;
 		running = false;
+		stopMusic();
 		if (tick_iv) { clearInterval(tick_iv); tick_iv = null; }
 		if (!gameOver && score > 0) {
 			saveScore(score, snake.length);
@@ -741,6 +856,7 @@ export function startSnakeGame(opts: SnakeGameOptions): SnakeGame {
 	calcArea();
 	resetGame();
 	render();
+	if (opts.music) startMusic();
 	tick_iv = setInterval(tick, 90);
 
 	if (signal) signal.addEventListener('abort', () => stop(), {once: true});
