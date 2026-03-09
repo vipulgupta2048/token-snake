@@ -612,7 +612,21 @@ export function startSnakeGame(opts: SnakeGameOptions): SnakeGame {
 
 			const lines: string[] = [];
 			lines.push('');
-			lines.push(`${FG.red}${BD}${deathMsg}${RS}`);
+			// Wrap death message if it overflows the box
+			const rawMsg = deathMsg;
+			if (vis(rawMsg) > boxW - 2) {
+				const sep = rawMsg.indexOf(' — ');
+				if (sep >= 0) {
+					lines.push(`${FG.red}${BD}${rawMsg.slice(0, sep)}${RS}`);
+					lines.push(`${FG.red}${BD}${rawMsg.slice(sep + 3)}${RS}`);
+				} else {
+					// Hard wrap at boxW - 2
+					lines.push(`${FG.red}${BD}${rawMsg.slice(0, boxW - 2)}${RS}`);
+					lines.push(`${FG.red}${BD}${rawMsg.slice(boxW - 2)}${RS}`);
+				}
+			} else {
+				lines.push(`${FG.red}${BD}${rawMsg}${RS}`);
+			}
 			lines.push('');
 			lines.push(`${FG.white}${BD}Score ${FG.cyan}${score}${RS}  ${FG.gray}Length ${FG.white}${snake.length}${RS}`);
 

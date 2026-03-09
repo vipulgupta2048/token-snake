@@ -1,6 +1,6 @@
 {
 	"name": "token-snake",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "🐍 An LLM-themed Snake game for your terminal — eat tokens, dodge hallucinations, grow your context window. Play while your AI agent thinks.",
 	"type": "module",
 	"bin": {
