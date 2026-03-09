@@ -53,17 +53,6 @@ Move the snake. Eat the good tokens. Avoid the bad ones. Don't hit the walls, ob
 | `Q` | Quit |
 | `Enter` | Restart (after game over) |
 
-## 🤖 Claude Code integration
-
-```bash
-npx token-snake --claude
-```
-
-One command installs hooks into `~/.claude/settings.json`. Split your terminal — play in one pane while Claude works in the other.
-
-Remove anytime with `npx token-snake --claude remove`.
-
-
 ## 🏗️ How it was built
 
 An AI built the game you play while waiting for AI.
